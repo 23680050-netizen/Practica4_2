@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import duckdb
 import numpy as np
 import pandas as pd
@@ -10,15 +12,63 @@ from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
-st.set_page_config(page_title="Práctica 4.2 - Regresión Lineal", layout="wide")
-st.title("Práctica 4.2: Regresión Lineal y Correlación")
-st.caption("Análisis y Exploración de Datos (INC-2505) - Predicción del Consumo Per Cápita de agua potable (CPC)")
+st.set_page_config(page_title="Práctica 4.2 - Regresión Lineal", page_icon="💧", layout="wide")
+
+
+# ---------------------------------------------------------------------------
+# Utilidades de presentación (no son parte del análisis)
+# ---------------------------------------------------------------------------
+def codigo(nombre):
+    """Lee este mismo archivo y devuelve el bloque marcado con '# >>> nombre'.
+    Así el código que se muestra en la página es exactamente el que se ejecuta."""
+    fuente = Path(__file__).read_text(encoding="utf-8")
+    inicio, fin = f"# >>> {nombre}", f"# <<< {nombre}"
+    return fuente.split(inicio)[1].split(fin)[0].strip("\n")
+
+
+def ver_codigo(nombre):
+    with st.expander("💻 Ver el código usado en este paso"):
+        st.code(codigo(nombre), language="python")
+
+
+def tarjeta(titulo, valor, c1, c2):
+    st.markdown(
+        f"""<div style="background:linear-gradient(135deg,{c1},{c2});padding:18px;
+        border-radius:14px;color:white;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.25)">
+        <div style="font-size:.95rem;opacity:.9">{titulo}</div>
+        <div style="font-size:1.8rem;font-weight:700">{valor}</div></div>""",
+        unsafe_allow_html=True,
+    )
+
+
+st.markdown(
+    """
+    <style>
+    .banner{background:linear-gradient(90deg,#7F00FF,#E100FF,#FF6A00);padding:26px;
+            border-radius:18px;text-align:center;box-shadow:0 6px 18px rgba(127,0,255,.35)}
+    .banner h1{color:white;margin:0;font-size:2.2rem}
+    .banner p{color:#fff;opacity:.92;margin:6px 0 0 0}
+    button[data-baseweb="tab"]{font-size:1.05rem;font-weight:600}
+    </style>
+    <div class="banner">
+        <h1>💧 Práctica 4.2: Regresión Lineal y Correlación</h1>
+        <p>Análisis y Exploración de Datos (INC-2505) · Predicción del Consumo Per Cápita de agua potable (CPC)</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+st.write("")
 
 # ---------------------------------------------------------------------------
 # PASO 1: SIMULACIÓN DE DATOS EN DUCKDB (REPRODUCIBLE)
 # ---------------------------------------------------------------------------
+# >>> paso1
 con = duckdb.connect(database=':memory:')
+
+# Fijar semilla determinista en DuckDB (setseed = 0.42)
 con.execute("SELECT setseed(0.42);")
+
+# Crear la tabla de telemetría de agua potable
 con.execute("""
 CREATE TABLE telemetria_agua AS
 WITH base AS (
@@ -36,99 +86,184 @@ SELECT *,
                + (random() * 6.0 - 3.0), 2) AS cpc_consumo
 FROM base;
 """)
-df_agua = con.execute("SELECT * FROM telemetria_agua").df()
 
-st.header("Paso 1: Primeros 5 registros obtenidos de DuckDB")
-st.dataframe(df_agua.head())
+# Extraer el dataset a un DataFrame de Pandas
+df_agua = con.execute("SELECT * FROM telemetria_agua").df()
+# <<< paso1
 
 # ---------------------------------------------------------------------------
 # PASO 2: MATRIZ DE CORRELACIÓN DE PEARSON
 # ---------------------------------------------------------------------------
+# >>> paso2
 matriz_correlacion = df_agua.drop(columns=['residencia_id']).corr(method='pearson')
-
-st.header("Paso 2: Matriz de correlación de Pearson (r)")
-st.dataframe(matriz_correlacion.round(4))
-st.write("Correlación lineal de cada variable con la respuesta `cpc_consumo`:")
-st.dataframe(matriz_correlacion['cpc_consumo'].drop('cpc_consumo').round(4))
+corr_con_cpc = matriz_correlacion['cpc_consumo'].drop('cpc_consumo')
+# <<< paso2
 
 # ---------------------------------------------------------------------------
 # PASO 3: REGRESIÓN LINEAL MÚLTIPLE (OLS)
 # ---------------------------------------------------------------------------
+# >>> paso3
+# Definir variables independientes (X) y dependiente (Y)
 X = df_agua[['temperatura_max', 'humedad_max', 'personas_familia', 'consumo_bidon_pc']]
 Y = df_agua['cpc_consumo']
-X_const = sm.add_constant(X)
-modelo_ols = sm.OLS(Y, X_const).fit()
 
-st.header("Paso 3: Resumen del modelo OLS (statsmodels)")
-st.text(str(modelo_ols.summary()))
+# Agregar término constante (Beta_0) para el intercepto OLS
+X_const = sm.add_constant(X)
+
+# Ajustar el modelo OLS
+modelo_ols = sm.OLS(Y, X_const).fit()
+# <<< paso3
 
 # ---------------------------------------------------------------------------
 # PASO 4: VALIDACIÓN DE SUPUESTOS EN LOS RESIDUOS
 # ---------------------------------------------------------------------------
+# >>> paso4
 residuos = modelo_ols.resid
-stat_sw, p_val_sw = stats.shapiro(residuos)
-dw_stat = durbin_watson(residuos)
 
-st.header("Paso 4: Diagnóstico de residuos y supuestos")
-st.write(f"1. Prueba de normalidad (Shapiro-Wilk): estadístico = {stat_sw:.4f}, valor p = {p_val_sw:.4f}")
-if p_val_sw > 0.05:
-    st.success("Los residuos cumplen con el supuesto de NORMALIDAD (p > 0.05).")
-else:
-    st.warning("Se rechaza la normalidad de los residuos (p <= 0.05).")
-st.write(f"2. Durbin-Watson (independencia): {dw_stat:.4f} (valores entre 1.5 y 2.5 indican ausencia de autocorrelación).")
+# 1. Prueba de normalidad de Shapiro-Wilk sobre los residuos
+stat_sw, p_val_sw = stats.shapiro(residuos)
+
+# 2. Prueba de autocorrelación de Durbin-Watson (ideal cercano a 2.0)
+dw_stat = durbin_watson(residuos)
+# <<< paso4
 
 # ---------------------------------------------------------------------------
 # PASO 5: EVALUACIÓN PREDICTIVA CON SCIKIT-LEARN
 # ---------------------------------------------------------------------------
+# >>> paso5
 model_sk = LinearRegression()
 model_sk.fit(X, Y)
+
 y_pred = model_sk.predict(X)
+
 r2_sk = r2_score(Y, y_pred)
 rmse_sk = np.sqrt(mean_squared_error(Y, y_pred))
-
-st.header("Paso 5: Métricas de rendimiento (scikit-learn)")
-col1, col2 = st.columns(2)
-col1.metric("R²", f"{r2_sk * 100:.2f}%")
-col2.metric("RMSE", f"{rmse_sk:.4f} lt/hab-día")
-st.write("Ecuación del modelo ajustado:")
-st.code(
-    f"CPC = {model_sk.intercept_:.2f} + ({model_sk.coef_[0]:.2f} * Temp) + "
-    f"({model_sk.coef_[1]:.2f} * Humedad) + ({model_sk.coef_[2]:.2f} * Personas) + "
-    f"({model_sk.coef_[3]:.2f} * Bidon)"
-)
+# <<< paso5
 
 # ---------------------------------------------------------------------------
 # PANEL DE GRÁFICAS
 # ---------------------------------------------------------------------------
-st.header("Panel de diagnóstico visual")
+# >>> graficas
 sns.set_theme(style="whitegrid")
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-fig.suptitle('Panel de Diagnóstico Visual: Regresión Lineal Múltiple (Subtema 4.2)', fontsize=16, fontweight='bold')
+fig.suptitle('Panel de Diagnóstico Visual: Regresión Lineal Múltiple (Subtema 4.2)',
+             fontsize=16, fontweight='bold', color='#5B21B6')
 
+# 1. Mapa de calor de correlación
 sns.heatmap(matriz_correlacion, annot=True, fmt=".2f", cmap="coolwarm", cbar=True, ax=axes[0, 0])
 axes[0, 0].set_title('1. Matriz de Correlación de Pearson (r)')
 
-sns.regplot(data=df_agua, x='humedad_max', y='cpc_consumo', color='b', ax=axes[0, 1],
-            line_kws={'color': 'red', 'linewidth': 2})
+# 2. Dispersión: humedad vs consumo
+sns.regplot(data=df_agua, x='humedad_max', y='cpc_consumo', color='#2563EB', ax=axes[0, 1],
+            line_kws={'color': '#EF4444', 'linewidth': 2})
 axes[0, 1].set_title('2. Tendencia: Humedad Máx vs Consumo')
 axes[0, 1].set_xlabel('Humedad Máxima (%)')
 axes[0, 1].set_ylabel('CPC Consumo (lt/hab-día)')
 
-axes[0, 2].scatter(y_pred, Y, alpha=0.7, color='teal')
+# 3. Valores reales vs predichos
+axes[0, 2].scatter(y_pred, Y, alpha=0.7, color='#14B8A6')
 axes[0, 2].plot([Y.min(), Y.max()], [Y.min(), Y.max()], 'r--', lw=2)
 axes[0, 2].set_title(f'3. Val. Reales vs Predichos (R² = {r2_sk * 100:.1f}%)')
 axes[0, 2].set_xlabel('CPC Predicho (ŷ)')
 axes[0, 2].set_ylabel('CPC Real (y)')
 
-axes[1, 0].scatter(y_pred, residuos, color='purple', alpha=0.6)
+# 4. Residuos vs valores ajustados (homocedasticidad)
+axes[1, 0].scatter(y_pred, residuos, color='#A855F7', alpha=0.6)
 axes[1, 0].axhline(y=0, color='r', linestyle='--', lw=2)
 axes[1, 0].set_title('4. Residuos vs Ajustados (Homocedasticidad)')
 axes[1, 0].set_xlabel('Valores Predichos (ŷ)')
 axes[1, 0].set_ylabel('Residuos (e = y - ŷ)')
 
+# 5. Gráfico Q-Q normal (normalidad de errores)
 sm.qqplot(residuos, line='45', fit=True, ax=axes[1, 1])
 axes[1, 1].set_title('5. Gráfico Q-Q Normal (Residuos)')
 
+# Ocultar la celda sobrante
 axes[1, 2].axis('off')
+
 plt.tight_layout()
-st.pyplot(fig)
+# <<< graficas
+
+# ---------------------------------------------------------------------------
+# PRESENTACIÓN POR PESTAÑAS
+# ---------------------------------------------------------------------------
+t1, t2, t3, t4, t5, t6 = st.tabs(
+    ["📋 1. Datos", "🔗 2. Correlación", "📐 3. Modelo OLS", "🧪 4. Supuestos", "🎯 5. Métricas", "📊 Gráficas"]
+)
+
+with t1:
+    st.subheader("Datos simulados con DuckDB")
+    st.write("Se generan **100 residencias** con semilla fija (`setseed(0.42)`), así el resultado es reproducible.")
+    st.dataframe(
+        df_agua.head().style.background_gradient(cmap="PuBu", subset=["cpc_consumo"]),
+        use_container_width=True,
+    )
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        tarjeta("Residencias", f"{len(df_agua)}", "#2563EB", "#06B6D4")
+    with c2:
+        tarjeta("Variables predictoras", "4", "#7C3AED", "#EC4899")
+    with c3:
+        tarjeta("CPC promedio", f"{df_agua['cpc_consumo'].mean():.1f} lt/hab-día", "#F97316", "#EF4444")
+    st.write("")
+    ver_codigo("paso1")
+
+with t2:
+    st.subheader("Matriz de correlación de Pearson (r)")
+    st.dataframe(
+        matriz_correlacion.round(4).style.background_gradient(cmap="coolwarm", vmin=-1, vmax=1),
+        use_container_width=True,
+    )
+    st.write("**Correlación de cada variable con `cpc_consumo`:**")
+    st.dataframe(corr_con_cpc.round(4).to_frame("r"), use_container_width=True)
+    mas_fuerte = corr_con_cpc.abs().idxmax()
+    st.info(f"La relación lineal más fuerte con el consumo es **{mas_fuerte}** (r = {corr_con_cpc[mas_fuerte]:.4f}).")
+    ver_codigo("paso2")
+
+with t3:
+    st.subheader("Resumen del modelo OLS (statsmodels)")
+    st.text(str(modelo_ols.summary()))
+    st.write("**Coeficientes estimados:**")
+    st.dataframe(modelo_ols.params.round(4).to_frame("coeficiente"), use_container_width=True)
+    ver_codigo("paso3")
+
+with t4:
+    st.subheader("Diagnóstico de residuos y supuestos")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        tarjeta("Shapiro-Wilk (estadístico)", f"{stat_sw:.4f}", "#059669", "#10B981")
+    with c2:
+        tarjeta("Valor p", f"{p_val_sw:.4f}", "#0EA5E9", "#6366F1")
+    with c3:
+        tarjeta("Durbin-Watson", f"{dw_stat:.4f}", "#D946EF", "#F43F5E")
+    st.write("")
+    if p_val_sw > 0.05:
+        st.success("Los residuos cumplen con el supuesto de NORMALIDAD (p > 0.05).")
+    else:
+        st.warning("Se rechaza la normalidad de los residuos (p <= 0.05).")
+    if 1.5 <= dw_stat <= 2.5:
+        st.success("Durbin-Watson entre 1.5 y 2.5: no hay autocorrelación en los residuos.")
+    else:
+        st.warning("Durbin-Watson fuera de 1.5 a 2.5: podría haber autocorrelación.")
+    ver_codigo("paso4")
+
+with t5:
+    st.subheader("Métricas de rendimiento (scikit-learn)")
+    c1, c2 = st.columns(2)
+    with c1:
+        tarjeta("Coeficiente de determinación (R²)", f"{r2_sk * 100:.2f}%", "#16A34A", "#84CC16")
+    with c2:
+        tarjeta("RMSE", f"{rmse_sk:.4f} lt/hab-día", "#EA580C", "#FACC15")
+    st.write("")
+    st.write("**Ecuación del modelo ajustado:**")
+    st.code(
+        f"CPC = {model_sk.intercept_:.2f} + ({model_sk.coef_[0]:.2f} * Temp) + "
+        f"({model_sk.coef_[1]:.2f} * Humedad) + ({model_sk.coef_[2]:.2f} * Personas) + "
+        f"({model_sk.coef_[3]:.2f} * Bidon)"
+    )
+    ver_codigo("paso5")
+
+with t6:
+    st.subheader("Panel de diagnóstico visual")
+    st.pyplot(fig)
+    ver_codigo("graficas")
