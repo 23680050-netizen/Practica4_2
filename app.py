@@ -31,27 +31,9 @@ def tarjeta(titulo, valor, c1, c2):
     )
 
 
-st.markdown(
-    """
-    <style>
-    .banner{background:linear-gradient(135deg,#CDB4F6,#F9C6E0,#FFE0B8);padding:28px 20px;
-            border-radius:18px;text-align:center;box-shadow:0 3px 12px rgba(0,0,0,.12)}
-    .banner h1{color:#4A3F6B;margin:0;font-size:2.2rem}
-    .banner p{color:#5E5380;margin:6px 0 0 0;font-size:1.05rem}
-    button[data-baseweb="tab"]{font-size:1.05rem;font-weight:600}
-    button[data-baseweb="tab"][aria-selected="true"]{color:#7C6BB5}
-    div[data-baseweb="tab-highlight"]{background-color:#B8A9E8}
-    </style>
-    <div class="banner">
-        <h1>Regresión Lineal y Correlación</h1>
-        <p>Práctica 4.2</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
 # ---------------------------------------------------------------------------
-# Mascota: al presionarla muestra de qué trata la práctica
+# Encabezado con mascota: al presionarla se despliega de qué trata la práctica.
+# Está dentro del encabezado (no flota), así nunca tapa el resto de la página.
 # ---------------------------------------------------------------------------
 MASCOTA_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
 <path d="M50 6 C50 6 14 52 14 76 C14 98 30 114 50 114 C70 114 86 98 86 76 C86 52 50 6 50 6 Z" fill="#BAE6FD" stroke="#7DD3FC" stroke-width="3"/>
@@ -69,20 +51,27 @@ mascota_b64 = base64.b64encode(MASCOTA_SVG.encode("utf-8")).decode("utf-8")
 st.markdown(
     """
     <style>
-    .mascota{position:fixed;bottom:56px;right:24px;z-index:9999;font-family:sans-serif}
-    .mascota summary{list-style:none;cursor:pointer;text-align:center;outline:none}
+    .banner{position:relative;background:linear-gradient(135deg,#CDB4F6,#F9C6E0,#FFE0B8);
+            padding:28px 100px;border-radius:18px;text-align:center;
+            box-shadow:0 3px 12px rgba(0,0,0,.12)}
+    .banner h1{color:#4A3F6B;margin:0;padding:0;font-size:2.2rem}
+    .banner p.sub{color:#5E5380;margin:6px 0 0 0;font-size:1.05rem}
+    button[data-baseweb="tab"]{font-size:1.05rem;font-weight:600}
+    button[data-baseweb="tab"][aria-selected="true"]{color:#7C6BB5}
+    div[data-baseweb="tab-highlight"]{background-color:#B8A9E8}
+    .mascota summary{position:absolute;top:10px;right:16px;list-style:none;cursor:pointer;
+        text-align:center;outline:none}
     .mascota summary::-webkit-details-marker{display:none}
-    .mascota summary img{width:82px;animation:flotar 3s ease-in-out infinite;transition:transform .2s}
+    .mascota summary img{width:64px;animation:flotar 3s ease-in-out infinite;transition:transform .2s}
     .mascota summary:hover img{transform:scale(1.1)}
-    .mascota .etiqueta{display:inline-block;margin-top:2px;padding:1px 10px;font-size:.75rem;
-        background:#F9C6E0;color:#4A3F6B;border-radius:10px}
-    .mascota .burbuja{position:absolute;bottom:calc(100% + 12px);right:0;width:min(330px,80vw);
-        max-height:60vh;overflow:auto;background:#FFFFFF;color:#3F3A5A;border:2px solid #CDB4F6;
-        border-radius:16px;padding:14px 16px;font-size:.88rem;line-height:1.45;
-        box-shadow:0 4px 16px rgba(0,0,0,.18)}
-    .mascota .burbuja p{margin:0 0 8px 0}
+    .mascota .etiqueta{display:block;width:fit-content;margin:0 auto;padding:0 9px;font-size:.7rem;
+        background:rgba(255,255,255,.7);color:#4A3F6B;border-radius:10px}
+    .mascota .burbuja{margin-top:16px;text-align:left;background:#FFFFFF;color:#3F3A5A;
+        border:2px solid #CDB4F6;border-radius:14px;padding:14px 18px;font-size:.92rem;line-height:1.45}
+    .mascota .burbuja p{margin:0 0 8px 0;color:#3F3A5A}
     .mascota .burbuja p:last-child{margin-bottom:0}
-    @keyframes flotar{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes flotar{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @media (max-width:640px){.banner{padding:68px 16px 22px 16px}}
     </style>
     """,
     unsafe_allow_html=True,
@@ -90,17 +79,21 @@ st.markdown(
 
 st.markdown(
     f"""
-    <details class="mascota">
-      <summary title="Presióname">
-        <img src="data:image/svg+xml;base64,{mascota_b64}" alt="Mascota">
-        <div class="etiqueta">Presióname</div>
-      </summary>
-      <div class="burbuja">
-        <p><b>Hola, te cuento de qué trata esta práctica.</b></p>
-        <p>Se usa una regresión lineal múltiple para predecir el consumo per cápita de agua potable (CPC, en lt/hab-día) a partir de la temperatura máxima, la humedad máxima, las personas por familia y el consumo de agua en bidón.</p>
-        <p>Los datos se simulan con DuckDB, se calcula la correlación de Pearson, se ajusta un modelo OLS, se revisan los supuestos de los residuos y se evalúa el modelo con scikit-learn. Recorre las pestañas para ver cada paso.</p>
-      </div>
-    </details>
+    <div class="banner">
+      <h1>Regresión Lineal y Correlación</h1>
+      <p class="sub">Práctica 4.2</p>
+      <details class="mascota">
+        <summary title="Presióname">
+          <img src="data:image/svg+xml;base64,{mascota_b64}" alt="Mascota">
+          <span class="etiqueta">Presióname</span>
+        </summary>
+        <div class="burbuja">
+          <p><b>Hola, te cuento de qué trata esta práctica.</b></p>
+          <p>Se usa una regresión lineal múltiple para predecir el consumo per cápita de agua potable (CPC, en lt/hab-día) a partir de la temperatura máxima, la humedad máxima, las personas por familia y el consumo de agua en bidón.</p>
+          <p>Los datos se simulan con DuckDB, se calcula la correlación de Pearson, se ajusta un modelo OLS, se revisan los supuestos de los residuos y se evalúa el modelo con scikit-learn. Recorre las pestañas para ver cada paso.</p>
+        </div>
+      </details>
+    </div>
     """,
     unsafe_allow_html=True,
 )
