@@ -12,7 +12,10 @@ from scipy import stats
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
-st.set_page_config(page_title="Práctica 4.2 - Regresión Lineal", page_icon="💧", layout="wide")
+st.set_page_config(page_title="Regresión Lineal y Correlación", layout="wide")
+
+# Paleta pastel para los mapas de color
+PASTEL_DIV = sns.diverging_palette(220, 20, s=70, l=82, as_cmap=True)
 
 
 # ---------------------------------------------------------------------------
@@ -27,16 +30,16 @@ def codigo(nombre):
 
 
 def ver_codigo(nombre):
-    with st.expander("💻 Ver el código usado en este paso"):
+    with st.expander("Ver el código usado en este paso"):
         st.code(codigo(nombre), language="python")
 
 
 def tarjeta(titulo, valor, c1, c2):
     st.markdown(
         f"""<div style="background:linear-gradient(135deg,{c1},{c2});padding:18px;
-        border-radius:14px;color:white;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.25)">
-        <div style="font-size:.95rem;opacity:.9">{titulo}</div>
-        <div style="font-size:1.8rem;font-weight:700">{valor}</div></div>""",
+        border-radius:14px;color:#3F3A5A;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.12)">
+        <div style="font-size:.95rem;opacity:.85">{titulo}</div>
+        <div style="font-size:1.7rem;font-weight:700">{valor}</div></div>""",
         unsafe_allow_html=True,
     )
 
@@ -44,15 +47,17 @@ def tarjeta(titulo, valor, c1, c2):
 st.markdown(
     """
     <style>
-    .banner{background:linear-gradient(90deg,#7F00FF,#E100FF,#FF6A00);padding:26px;
-            border-radius:18px;text-align:center;box-shadow:0 6px 18px rgba(127,0,255,.35)}
-    .banner h1{color:white;margin:0;font-size:2.2rem}
-    .banner p{color:#fff;opacity:.92;margin:6px 0 0 0}
+    .banner{background:linear-gradient(135deg,#CDB4F6,#F9C6E0,#FFE0B8);padding:28px 20px;
+            border-radius:18px;text-align:center;box-shadow:0 3px 12px rgba(0,0,0,.12)}
+    .banner h1{color:#4A3F6B;margin:0;font-size:2.2rem}
+    .banner p{color:#5E5380;margin:6px 0 0 0;font-size:1.05rem}
     button[data-baseweb="tab"]{font-size:1.05rem;font-weight:600}
+    button[data-baseweb="tab"][aria-selected="true"]{color:#7C6BB5}
+    div[data-baseweb="tab-highlight"]{background-color:#B8A9E8}
     </style>
     <div class="banner">
-        <h1>💧 Práctica 4.2: Regresión Lineal y Correlación</h1>
-        <p>Análisis y Exploración de Datos (INC-2505) · Predicción del Consumo Per Cápita de agua potable (CPC)</p>
+        <h1>Regresión Lineal y Correlación</h1>
+        <p>Práctica 4.2</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -147,35 +152,37 @@ rmse_sk = np.sqrt(mean_squared_error(Y, y_pred))
 sns.set_theme(style="whitegrid")
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 fig.suptitle('Panel de Diagnóstico Visual: Regresión Lineal Múltiple (Subtema 4.2)',
-             fontsize=16, fontweight='bold', color='#5B21B6')
+             fontsize=16, fontweight='bold', color='#6D5BA8')
 
 # 1. Mapa de calor de correlación
-sns.heatmap(matriz_correlacion, annot=True, fmt=".2f", cmap="coolwarm", cbar=True, ax=axes[0, 0])
+sns.heatmap(matriz_correlacion, annot=True, fmt=".2f", cmap=PASTEL_DIV, cbar=True, ax=axes[0, 0])
 axes[0, 0].set_title('1. Matriz de Correlación de Pearson (r)')
 
 # 2. Dispersión: humedad vs consumo
-sns.regplot(data=df_agua, x='humedad_max', y='cpc_consumo', color='#2563EB', ax=axes[0, 1],
-            line_kws={'color': '#EF4444', 'linewidth': 2})
+sns.regplot(data=df_agua, x='humedad_max', y='cpc_consumo', color='#93C5FD', ax=axes[0, 1],
+            scatter_kws={'edgecolor': '#60A5FA'},
+            line_kws={'color': '#F472B6', 'linewidth': 2})
 axes[0, 1].set_title('2. Tendencia: Humedad Máx vs Consumo')
 axes[0, 1].set_xlabel('Humedad Máxima (%)')
 axes[0, 1].set_ylabel('CPC Consumo (lt/hab-día)')
 
 # 3. Valores reales vs predichos
-axes[0, 2].scatter(y_pred, Y, alpha=0.7, color='#14B8A6')
-axes[0, 2].plot([Y.min(), Y.max()], [Y.min(), Y.max()], 'r--', lw=2)
+axes[0, 2].scatter(y_pred, Y, alpha=0.8, color='#99F6E4', edgecolor='#2DD4BF')
+axes[0, 2].plot([Y.min(), Y.max()], [Y.min(), Y.max()], '--', color='#FB7185', lw=2)
 axes[0, 2].set_title(f'3. Val. Reales vs Predichos (R² = {r2_sk * 100:.1f}%)')
 axes[0, 2].set_xlabel('CPC Predicho (ŷ)')
 axes[0, 2].set_ylabel('CPC Real (y)')
 
 # 4. Residuos vs valores ajustados (homocedasticidad)
-axes[1, 0].scatter(y_pred, residuos, color='#A855F7', alpha=0.6)
-axes[1, 0].axhline(y=0, color='r', linestyle='--', lw=2)
+axes[1, 0].scatter(y_pred, residuos, color='#DDD6FE', edgecolor='#A78BFA', alpha=0.9)
+axes[1, 0].axhline(y=0, color='#FB7185', linestyle='--', lw=2)
 axes[1, 0].set_title('4. Residuos vs Ajustados (Homocedasticidad)')
 axes[1, 0].set_xlabel('Valores Predichos (ŷ)')
 axes[1, 0].set_ylabel('Residuos (e = y - ŷ)')
 
 # 5. Gráfico Q-Q normal (normalidad de errores)
-sm.qqplot(residuos, line='45', fit=True, ax=axes[1, 1])
+sm.qqplot(residuos, line='45', fit=True, ax=axes[1, 1],
+          markerfacecolor='#FBCFE8', markeredgecolor='#F472B6')
 axes[1, 1].set_title('5. Gráfico Q-Q Normal (Residuos)')
 
 # Ocultar la celda sobrante
@@ -188,30 +195,30 @@ plt.tight_layout()
 # PRESENTACIÓN POR PESTAÑAS
 # ---------------------------------------------------------------------------
 t1, t2, t3, t4, t5, t6 = st.tabs(
-    ["📋 1. Datos", "🔗 2. Correlación", "📐 3. Modelo OLS", "🧪 4. Supuestos", "🎯 5. Métricas", "📊 Gráficas"]
+    ["1. Datos", "2. Correlación", "3. Modelo OLS", "4. Supuestos", "5. Métricas", "Gráficas"]
 )
 
 with t1:
     st.subheader("Datos simulados con DuckDB")
     st.write("Se generan **100 residencias** con semilla fija (`setseed(0.42)`), así el resultado es reproducible.")
     st.dataframe(
-        df_agua.head().style.background_gradient(cmap="PuBu", subset=["cpc_consumo"]),
+        df_agua.head().style.background_gradient(cmap="BuPu", subset=["cpc_consumo"], low=0, high=0.4),
         use_container_width=True,
     )
     c1, c2, c3 = st.columns(3)
     with c1:
-        tarjeta("Residencias", f"{len(df_agua)}", "#2563EB", "#06B6D4")
+        tarjeta("Residencias", f"{len(df_agua)}", "#BFDBFE", "#A5F3FC")
     with c2:
-        tarjeta("Variables predictoras", "4", "#7C3AED", "#EC4899")
+        tarjeta("Variables predictoras", "4", "#DDD6FE", "#FBCFE8")
     with c3:
-        tarjeta("CPC promedio", f"{df_agua['cpc_consumo'].mean():.1f} lt/hab-día", "#F97316", "#EF4444")
+        tarjeta("CPC promedio", f"{df_agua['cpc_consumo'].mean():.1f} lt/hab-día", "#FED7AA", "#FECACA")
     st.write("")
     ver_codigo("paso1")
 
 with t2:
     st.subheader("Matriz de correlación de Pearson (r)")
     st.dataframe(
-        matriz_correlacion.round(4).style.background_gradient(cmap="coolwarm", vmin=-1, vmax=1),
+        matriz_correlacion.round(4).style.background_gradient(cmap=PASTEL_DIV, vmin=-1, vmax=1),
         use_container_width=True,
     )
     st.write("**Correlación de cada variable con `cpc_consumo`:**")
@@ -231,11 +238,11 @@ with t4:
     st.subheader("Diagnóstico de residuos y supuestos")
     c1, c2, c3 = st.columns(3)
     with c1:
-        tarjeta("Shapiro-Wilk (estadístico)", f"{stat_sw:.4f}", "#059669", "#10B981")
+        tarjeta("Shapiro-Wilk (estadístico)", f"{stat_sw:.4f}", "#BBF7D0", "#A7F3D0")
     with c2:
-        tarjeta("Valor p", f"{p_val_sw:.4f}", "#0EA5E9", "#6366F1")
+        tarjeta("Valor p", f"{p_val_sw:.4f}", "#BAE6FD", "#C7D2FE")
     with c3:
-        tarjeta("Durbin-Watson", f"{dw_stat:.4f}", "#D946EF", "#F43F5E")
+        tarjeta("Durbin-Watson", f"{dw_stat:.4f}", "#F5D0FE", "#FECDD3")
     st.write("")
     if p_val_sw > 0.05:
         st.success("Los residuos cumplen con el supuesto de NORMALIDAD (p > 0.05).")
@@ -251,9 +258,9 @@ with t5:
     st.subheader("Métricas de rendimiento (scikit-learn)")
     c1, c2 = st.columns(2)
     with c1:
-        tarjeta("Coeficiente de determinación (R²)", f"{r2_sk * 100:.2f}%", "#16A34A", "#84CC16")
+        tarjeta("Coeficiente de determinación (R²)", f"{r2_sk * 100:.2f}%", "#BBF7D0", "#D9F99D")
     with c2:
-        tarjeta("RMSE", f"{rmse_sk:.4f} lt/hab-día", "#EA580C", "#FACC15")
+        tarjeta("RMSE", f"{rmse_sk:.4f} lt/hab-día", "#FED7AA", "#FEF08A")
     st.write("")
     st.write("**Ecuación del modelo ajustado:**")
     st.code(
