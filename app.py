@@ -1,4 +1,4 @@
-from pathlib import Path
+import base64
 
 import duckdb
 import numpy as np
@@ -21,19 +21,6 @@ PASTEL_DIV = sns.diverging_palette(220, 20, s=70, l=82, as_cmap=True)
 # ---------------------------------------------------------------------------
 # Utilidades de presentación (no son parte del análisis)
 # ---------------------------------------------------------------------------
-def codigo(nombre):
-    """Lee este mismo archivo y devuelve el bloque marcado con '# >>> nombre'.
-    Así el código que se muestra en la página es exactamente el que se ejecuta."""
-    fuente = Path(__file__).read_text(encoding="utf-8")
-    inicio, fin = f"# >>> {nombre}", f"# <<< {nombre}"
-    return fuente.split(inicio)[1].split(fin)[0].strip("\n")
-
-
-def ver_codigo(nombre):
-    with st.expander("Ver el código usado en este paso"):
-        st.code(codigo(nombre), language="python")
-
-
 def tarjeta(titulo, valor, c1, c2):
     st.markdown(
         f"""<div style="background:linear-gradient(135deg,{c1},{c2});padding:18px;
@@ -62,12 +49,66 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# ---------------------------------------------------------------------------
+# Mascota: al presionarla muestra de qué trata la práctica
+# ---------------------------------------------------------------------------
+MASCOTA_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120">
+<path d="M50 6 C50 6 14 52 14 76 C14 98 30 114 50 114 C70 114 86 98 86 76 C86 52 50 6 50 6 Z" fill="#BAE6FD" stroke="#7DD3FC" stroke-width="3"/>
+<path d="M30 74 C30 63 37 55 43 49" stroke="#FFFFFF" stroke-opacity="0.8" stroke-width="5" fill="none" stroke-linecap="round"/>
+<circle cx="38" cy="82" r="5" fill="#3F3A5A"/>
+<circle cx="62" cy="82" r="5" fill="#3F3A5A"/>
+<circle cx="39.6" cy="80.4" r="1.7" fill="#FFFFFF"/>
+<circle cx="63.6" cy="80.4" r="1.7" fill="#FFFFFF"/>
+<ellipse cx="29" cy="92" rx="5" ry="3" fill="#FBCFE8"/>
+<ellipse cx="71" cy="92" rx="5" ry="3" fill="#FBCFE8"/>
+<path d="M42 94 Q50 102 58 94" stroke="#3F3A5A" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>"""
+mascota_b64 = base64.b64encode(MASCOTA_SVG.encode("utf-8")).decode("utf-8")
+
+st.markdown(
+    """
+    <style>
+    .mascota{position:fixed;bottom:56px;right:24px;z-index:9999;font-family:sans-serif}
+    .mascota summary{list-style:none;cursor:pointer;text-align:center;outline:none}
+    .mascota summary::-webkit-details-marker{display:none}
+    .mascota summary img{width:82px;animation:flotar 3s ease-in-out infinite;transition:transform .2s}
+    .mascota summary:hover img{transform:scale(1.1)}
+    .mascota .etiqueta{display:inline-block;margin-top:2px;padding:1px 10px;font-size:.75rem;
+        background:#F9C6E0;color:#4A3F6B;border-radius:10px}
+    .mascota .burbuja{position:absolute;bottom:calc(100% + 12px);right:0;width:min(330px,80vw);
+        max-height:60vh;overflow:auto;background:#FFFFFF;color:#3F3A5A;border:2px solid #CDB4F6;
+        border-radius:16px;padding:14px 16px;font-size:.88rem;line-height:1.45;
+        box-shadow:0 4px 16px rgba(0,0,0,.18)}
+    .mascota .burbuja p{margin:0 0 8px 0}
+    .mascota .burbuja p:last-child{margin-bottom:0}
+    @keyframes flotar{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    f"""
+    <details class="mascota">
+      <summary title="Presióname">
+        <img src="data:image/svg+xml;base64,{mascota_b64}" alt="Mascota">
+        <div class="etiqueta">Presióname</div>
+      </summary>
+      <div class="burbuja">
+        <p><b>Hola, te cuento de qué trata esta práctica.</b></p>
+        <p>Se usa una regresión lineal múltiple para predecir el consumo per cápita de agua potable (CPC, en lt/hab-día) a partir de la temperatura máxima, la humedad máxima, las personas por familia y el consumo de agua en bidón.</p>
+        <p>Los datos se simulan con DuckDB, se calcula la correlación de Pearson, se ajusta un modelo OLS, se revisan los supuestos de los residuos y se evalúa el modelo con scikit-learn. Recorre las pestañas para ver cada paso.</p>
+      </div>
+    </details>
+    """,
+    unsafe_allow_html=True,
+)
 st.write("")
 
 # ---------------------------------------------------------------------------
 # PASO 1: SIMULACIÓN DE DATOS EN DUCKDB (REPRODUCIBLE)
 # ---------------------------------------------------------------------------
-# >>> paso1
 con = duckdb.connect(database=':memory:')
 
 # Fijar semilla determinista en DuckDB (setseed = 0.42)
@@ -94,20 +135,16 @@ FROM base;
 
 # Extraer el dataset a un DataFrame de Pandas
 df_agua = con.execute("SELECT * FROM telemetria_agua").df()
-# <<< paso1
 
 # ---------------------------------------------------------------------------
 # PASO 2: MATRIZ DE CORRELACIÓN DE PEARSON
 # ---------------------------------------------------------------------------
-# >>> paso2
 matriz_correlacion = df_agua.drop(columns=['residencia_id']).corr(method='pearson')
 corr_con_cpc = matriz_correlacion['cpc_consumo'].drop('cpc_consumo')
-# <<< paso2
 
 # ---------------------------------------------------------------------------
 # PASO 3: REGRESIÓN LINEAL MÚLTIPLE (OLS)
 # ---------------------------------------------------------------------------
-# >>> paso3
 # Definir variables independientes (X) y dependiente (Y)
 X = df_agua[['temperatura_max', 'humedad_max', 'personas_familia', 'consumo_bidon_pc']]
 Y = df_agua['cpc_consumo']
@@ -117,12 +154,10 @@ X_const = sm.add_constant(X)
 
 # Ajustar el modelo OLS
 modelo_ols = sm.OLS(Y, X_const).fit()
-# <<< paso3
 
 # ---------------------------------------------------------------------------
 # PASO 4: VALIDACIÓN DE SUPUESTOS EN LOS RESIDUOS
 # ---------------------------------------------------------------------------
-# >>> paso4
 residuos = modelo_ols.resid
 
 # 1. Prueba de normalidad de Shapiro-Wilk sobre los residuos
@@ -130,12 +165,10 @@ stat_sw, p_val_sw = stats.shapiro(residuos)
 
 # 2. Prueba de autocorrelación de Durbin-Watson (ideal cercano a 2.0)
 dw_stat = durbin_watson(residuos)
-# <<< paso4
 
 # ---------------------------------------------------------------------------
 # PASO 5: EVALUACIÓN PREDICTIVA CON SCIKIT-LEARN
 # ---------------------------------------------------------------------------
-# >>> paso5
 model_sk = LinearRegression()
 model_sk.fit(X, Y)
 
@@ -143,12 +176,10 @@ y_pred = model_sk.predict(X)
 
 r2_sk = r2_score(Y, y_pred)
 rmse_sk = np.sqrt(mean_squared_error(Y, y_pred))
-# <<< paso5
 
 # ---------------------------------------------------------------------------
 # PANEL DE GRÁFICAS
 # ---------------------------------------------------------------------------
-# >>> graficas
 sns.set_theme(style="whitegrid")
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 fig.suptitle('Panel de Diagnóstico Visual: Regresión Lineal Múltiple (Subtema 4.2)',
@@ -189,7 +220,6 @@ axes[1, 1].set_title('5. Gráfico Q-Q Normal (Residuos)')
 axes[1, 2].axis('off')
 
 plt.tight_layout()
-# <<< graficas
 
 # ---------------------------------------------------------------------------
 # PRESENTACIÓN POR PESTAÑAS
@@ -213,7 +243,6 @@ with t1:
     with c3:
         tarjeta("CPC promedio", f"{df_agua['cpc_consumo'].mean():.1f} lt/hab-día", "#FED7AA", "#FECACA")
     st.write("")
-    ver_codigo("paso1")
 
 with t2:
     st.subheader("Matriz de correlación de Pearson (r)")
@@ -225,14 +254,12 @@ with t2:
     st.dataframe(corr_con_cpc.round(4).to_frame("r"), use_container_width=True)
     mas_fuerte = corr_con_cpc.abs().idxmax()
     st.info(f"La relación lineal más fuerte con el consumo es **{mas_fuerte}** (r = {corr_con_cpc[mas_fuerte]:.4f}).")
-    ver_codigo("paso2")
 
 with t3:
     st.subheader("Resumen del modelo OLS (statsmodels)")
     st.text(str(modelo_ols.summary()))
     st.write("**Coeficientes estimados:**")
     st.dataframe(modelo_ols.params.round(4).to_frame("coeficiente"), use_container_width=True)
-    ver_codigo("paso3")
 
 with t4:
     st.subheader("Diagnóstico de residuos y supuestos")
@@ -252,7 +279,6 @@ with t4:
         st.success("Durbin-Watson entre 1.5 y 2.5: no hay autocorrelación en los residuos.")
     else:
         st.warning("Durbin-Watson fuera de 1.5 a 2.5: podría haber autocorrelación.")
-    ver_codigo("paso4")
 
 with t5:
     st.subheader("Métricas de rendimiento (scikit-learn)")
@@ -268,9 +294,7 @@ with t5:
         f"({model_sk.coef_[1]:.2f} * Humedad) + ({model_sk.coef_[2]:.2f} * Personas) + "
         f"({model_sk.coef_[3]:.2f} * Bidon)"
     )
-    ver_codigo("paso5")
 
 with t6:
     st.subheader("Panel de diagnóstico visual")
     st.pyplot(fig)
-    ver_codigo("graficas")
